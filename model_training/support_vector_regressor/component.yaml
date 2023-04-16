@@ -1,0 +1,124 @@
+name: Support vector regressor
+description: Trains a support vector regressor model.
+inputs:
+- {name: inputs_dataset, type: Dataset, description: The dataset of inputs to train
+    on. This is usually the training set.}
+- {name: labels_dataset, type: Dataset, description: The labels associated with the
+    inputs.}
+- {name: kernel, type: String, description: Please see the documentation for sklearn.svm.SVR
+    for more details., default: rbf, optional: true}
+- {name: degree, type: Float, description: Please see the documentation for sklearn.svm.SVR
+    for more details., default: '3', optional: true}
+- {name: gamma, type: String, description: Please see the documentation for sklearn.svm.SVR
+    for more details., default: scale, optional: true}
+- {name: coef0, type: Float, description: Please see the documentation for sklearn.svm.SVR
+    for more details., default: '0.0', optional: true}
+- {name: tol, type: Float, description: Please see the documentation for sklearn.svm.SVR
+    for more details., default: '0.001', optional: true}
+- {name: c, type: Float, description: Please see the documentation for sklearn.svm.SVR
+    for more details., default: '1.0', optional: true}
+- {name: epsilon, type: Float, description: Please see the documentation for sklearn.svm.SVR
+    for more details., default: '0.1', optional: true}
+- name: shrinking
+  type: Boolean
+  description: Please see the documentation for sklearn.svm.SVR for more details.
+  default: "True"
+  optional: true
+- {name: cache_size, type: Integer, description: Please see the documentation for
+    sklearn.svm.SVR for more details., default: '200', optional: true}
+- name: verbose
+  type: Boolean
+  description: Please see the documentation for sklearn.svm.SVR for more details.
+  default: "False"
+  optional: true
+- {name: max_iter, type: Integer, description: Please see the documentation for sklearn.svm.SVR
+    for more details., default: '-1', optional: true}
+outputs:
+- {name: trained_model, type: Model}
+implementation:
+  container:
+    image: python:3.7
+    command:
+    - sh
+    - -c
+    - |2
+
+      if ! [ -x "$(command -v pip)" ]; then
+          python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip
+      fi
+
+      PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'scikit-learn' 'numpy' 'kfp==1.8.19' && "$0" "$@"
+    - sh
+    - -ec
+    - |
+      program_path=$(mktemp -d)
+      printf "%s" "$0" > "$program_path/ephemeral_component.py"
+      python3 -m kfp.v2.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+    - |2+
+
+      import kfp
+      from kfp.v2 import dsl
+      from kfp.v2.dsl import *
+      from typing import *
+
+      def support_vector_regressor(
+              inputs_dataset: Input[Dataset],
+              labels_dataset: Input[Dataset],
+              trained_model: Output[Model],
+              kernel: str = "rbf",
+              degree: float = 3,
+              gamma: str = "scale",
+              coef0: float = 0.0,
+              tol: float = 1e-3,
+              c: float = 1.0,
+              epsilon: float = 0.1,
+              shrinking: bool = True,
+              cache_size: int = 200,
+              verbose: bool = False,
+              max_iter: int = -1,
+      ):
+          """
+          Trains a support vector regressor model.
+          :param inputs_dataset: The dataset of inputs to train on. This is usually the training set.
+          :param labels_dataset: The labels associated with the inputs.
+          :param kernel: Please see the documentation for sklearn.svm.SVR for more details.
+          :param degree: Please see the documentation for sklearn.svm.SVR for more details.
+          :param gamma: Please see the documentation for sklearn.svm.SVR for more details.
+          :param coef0: Please see the documentation for sklearn.svm.SVR for more details.
+          :param tol: Please see the documentation for sklearn.svm.SVR for more details.
+          :param c: Please see the documentation for sklearn.svm.SVR for more details.
+          :param epsilon: Please see the documentation for sklearn.svm.SVR for more details.
+          :param shrinking: Please see the documentation for sklearn.svm.SVR for more details.
+          :param cache_size: Please see the documentation for sklearn.svm.SVR for more details.
+          :param verbose: Please see the documentation for sklearn.svm.SVR for more details.
+          :param max_iter: Please see the documentation for sklearn.svm.SVR for more details.
+          :return:
+          """
+          from sklearn.svm import SVR
+          import numpy as np
+          import joblib
+
+          X = np.genfromtxt(inputs_dataset.path, delimiter=",")
+          y = np.genfromtxt(labels_dataset.path, delimiter=",")
+
+          model = SVR(
+              kernel=kernel,
+              degree=degree,
+              gamma=gamma,
+              coef0=coef0,
+              tol=tol,
+              C=c,
+              epsilon=epsilon,
+              shrinking=shrinking,
+              cache_size=cache_size,
+              verbose=verbose,
+              max_iter=max_iter,
+          ).fit(X, y)
+
+          joblib.dump(model, trained_model.path)
+
+    args:
+    - --executor_input
+    - {executorInput: null}
+    - --function_to_execute
+    - support_vector_regressor

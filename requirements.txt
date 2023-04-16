@@ -1,0 +1,7 @@
+kfp~=1.8.0
+scikit-datasets
+scikit-learn
+xgboost
+IPython
+joblib
+pandas

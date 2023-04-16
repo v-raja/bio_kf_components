@@ -1,0 +1,74 @@
+name: Accuracy score
+description: Accuracy is the proportion of correct predictions among the total number
+  of cases processed. It can be
+inputs:
+- {name: ground_truth_labels, type: Dataset, description: The ground-truth labels
+    (from the test dataset).}
+- {name: predicted_labels, type: Dataset, description: The predicted labels (for the
+    test dataset).}
+outputs:
+- {name: mlpipeline_metrics, type: Metrics, description: The Kubeflow metrics output.}
+implementation:
+  container:
+    image: python:3.7
+    command:
+    - sh
+    - -c
+    - |2
+
+      if ! [ -x "$(command -v pip)" ]; then
+          python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip
+      fi
+
+      PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'scikit-learn' 'numpy' 'kfp==1.8.19' && "$0" "$@"
+    - sh
+    - -ec
+    - |
+      program_path=$(mktemp -d)
+      printf "%s" "$0" > "$program_path/ephemeral_component.py"
+      python3 -m kfp.v2.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+    - |2+
+
+      import kfp
+      from kfp.v2 import dsl
+      from kfp.v2.dsl import *
+      from typing import *
+
+      def accuracy_score(
+              ground_truth_labels: dsl.Input[dsl.Dataset],
+              predicted_labels: dsl.Input[dsl.Dataset],
+              mlpipeline_metrics: dsl.Output[dsl.Metrics],
+      ):
+          """
+          Accuracy is the proportion of correct predictions among the total number of cases processed. It can be
+          computed with: Accuracy = (TP + TN) / (TP + TN + FP + FN) Where: TP: True positive TN: True negative FP: False positive
+          FN: False negative.
+          :param ground_truth_labels: The ground-truth labels (from the test dataset).
+          :param predicted_labels: The predicted labels (for the test dataset).
+          :param mlpipeline_metrics: The Kubeflow metrics output.
+          """
+          import numpy as np
+          from sklearn.metrics import accuracy_score
+          import json
+
+          y = np.loadtxt(ground_truth_labels.path)
+          y_pred = np.loadtxt(predicted_labels.path)
+
+          metrics = {
+              "metrics": [
+                  {
+                      "name": "accuracy",  # The name of the metric. Should be same as the id of validation metric.
+                      "numberValue": accuracy_score(y, y_pred),
+                      "format": "RAW",
+                  },
+              ]
+          }
+
+          with open(mlpipeline_metrics.path, "w") as f:
+              json.dump(metrics, f)
+
+    args:
+    - --executor_input
+    - {executorInput: null}
+    - --function_to_execute
+    - accuracy_score

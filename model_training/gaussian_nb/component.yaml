@@ -1,0 +1,65 @@
+name: Gaussian naive bayes
+description: Trains a Gaussian Naive Bayes model.
+inputs:
+- {name: inputs_dataset, type: Dataset, description: The dataset of inputs to train
+    on.}
+- {name: labels_dataset, type: Dataset, description: The labels associated with the
+    inputs.}
+- {name: var_smoothing, type: Float, description: The amount of smoothing to apply
+    to the variance., default: 1e-09, optional: true}
+outputs:
+- {name: trained_model, type: Model, description: The trained model.}
+implementation:
+  container:
+    image: python:3.7
+    command:
+    - sh
+    - -c
+    - |2
+
+      if ! [ -x "$(command -v pip)" ]; then
+          python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip
+      fi
+
+      PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'scikit-learn' 'numpy' 'kfp==1.8.19' && "$0" "$@"
+    - sh
+    - -ec
+    - |
+      program_path=$(mktemp -d)
+      printf "%s" "$0" > "$program_path/ephemeral_component.py"
+      python3 -m kfp.v2.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+    - |2+
+
+      import kfp
+      from kfp.v2 import dsl
+      from kfp.v2.dsl import *
+      from typing import *
+
+      def gaussian_naive_bayes(
+              inputs_dataset: Input[Dataset],
+              labels_dataset: Input[Dataset],
+              trained_model: Output[Model],
+              var_smoothing: float = 1e-9,
+      ):
+          """
+          Trains a Gaussian Naive Bayes model.
+          :param inputs_dataset: The dataset of inputs to train on.
+          :param labels_dataset: The labels associated with the inputs.
+          :param trained_model: The trained model.
+          :param var_smoothing: The amount of smoothing to apply to the variance.
+          """
+          from sklearn.naive_bayes import GaussianNB
+          import numpy as np
+          import joblib
+
+          X = np.genfromtxt(inputs_dataset.path, delimiter=",")
+          y = np.genfromtxt(labels_dataset.path, delimiter=",")
+
+          model = GaussianNB(var_smoothing=var_smoothing).fit(X, y)
+          joblib.dump(model, trained_model.path)
+
+    args:
+    - --executor_input
+    - {executorInput: null}
+    - --function_to_execute
+    - gaussian_naive_bayes

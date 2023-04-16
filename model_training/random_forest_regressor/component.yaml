@@ -1,0 +1,127 @@
+name: Random forest regressor
+description: Trains a Random Forest Regressor model.
+inputs:
+- {name: inputs_dataset, type: Dataset, description: The dataset of inputs to train
+    on.}
+- {name: labels_dataset, type: Dataset, description: The labels associated with the
+    inputs.}
+- {name: n_estimators, type: Integer, description: The number of trees in the forest.,
+  default: '100', optional: true}
+- name: max_depth
+  type: Integer
+  description: |-
+    The maximum depth of the tree. If 0, then nodes are expanded until
+    all leaves are pure or until all leaves contain less than
+    min_samples_split samples.
+  default: '0'
+  optional: true
+- name: min_samples_split
+  type: Float
+  description: |-
+    The minimum number of samples required to split an internal node:
+    - If int, then consider `min_samples_split` as the minimum number.
+    - If float, then `min_samples_split` is a fraction and
+      `ceil(min_samples_split * n_samples)` are the minimum
+      number of samples for each split.
+  default: '2.0'
+  optional: true
+- name: min_samples_leaf
+  type: Float
+  description: |-
+    The minimum number of samples required to be at a leaf node.
+    A split point at any depth will only be considered if it leaves at
+    least ``min_samples_leaf`` training samples in each of the left and
+    right branches.  This may have the effect of smoothing the model,
+    especially in regression.
+
+    - If int, then consider `min_samples_leaf` as the minimum number.
+    - If float, then `min_samples_leaf` is a fraction and
+      `ceil(min_samples_leaf * n_samples)` are the minimum
+      number of samples for each node.
+  default: '1.0'
+  optional: true
+outputs:
+- {name: trained_model, type: Model, description: The trained model.}
+implementation:
+  container:
+    image: python:3.7
+    command:
+    - sh
+    - -c
+    - |2
+
+      if ! [ -x "$(command -v pip)" ]; then
+          python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip
+      fi
+
+      PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'scikit-learn' 'numpy' 'kfp==1.8.19' && "$0" "$@"
+    - sh
+    - -ec
+    - |
+      program_path=$(mktemp -d)
+      printf "%s" "$0" > "$program_path/ephemeral_component.py"
+      python3 -m kfp.v2.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+    - |2+
+
+      import kfp
+      from kfp.v2 import dsl
+      from kfp.v2.dsl import *
+      from typing import *
+
+      def random_forest_regressor(
+              inputs_dataset: Input[Dataset],
+              labels_dataset: Input[Dataset],
+              trained_model: Output[Model],
+              n_estimators: int = 100,
+              max_depth: int = 0,
+              min_samples_split: float = 2.0,
+              min_samples_leaf: float = 1.0,
+      ):
+          """
+          Trains a Random Forest Regressor model.
+          :param inputs_dataset: The dataset of inputs to train on.
+          :param labels_dataset: The labels associated with the inputs.
+          :param trained_model: The trained model.
+          :param n_estimators: The number of trees in the forest.
+          :param max_depth: The maximum depth of the tree. If 0, then nodes are expanded until
+              all leaves are pure or until all leaves contain less than
+              min_samples_split samples.
+          :param min_samples_split: The minimum number of samples required to split an internal node:
+
+              - If int, then consider `min_samples_split` as the minimum number.
+              - If float, then `min_samples_split` is a fraction and
+                `ceil(min_samples_split * n_samples)` are the minimum
+                number of samples for each split.
+          :param min_samples_leaf: The minimum number of samples required to be at a leaf node.
+              A split point at any depth will only be considered if it leaves at
+              least ``min_samples_leaf`` training samples in each of the left and
+              right branches.  This may have the effect of smoothing the model,
+              especially in regression.
+
+              - If int, then consider `min_samples_leaf` as the minimum number.
+              - If float, then `min_samples_leaf` is a fraction and
+                `ceil(min_samples_leaf * n_samples)` are the minimum
+                number of samples for each node.
+          :return:
+          """
+          from sklearn.ensemble import RandomForestRegressor
+          import numpy as np
+          import joblib
+
+          X = np.genfromtxt(inputs_dataset.path, delimiter=",")
+          y = np.genfromtxt(labels_dataset.path, delimiter=",")
+
+          model = RandomForestRegressor(
+              n_estimators=n_estimators,
+              max_depth=None if max_depth == 0 else max_depth,
+              min_samples_split=int(min_samples_split) if min_samples_split.is_integer() else min_samples_split,
+              min_samples_leaf=int(min_samples_leaf) if min_samples_leaf.is_integer() else min_samples_leaf,
+          ).fit(X, y)
+
+          joblib.dump(model, trained_model.path)
+
+    args:
+    - --executor_input
+    - {executorInput: null}
+    - --function_to_execute
+    - random_forest_regressor
