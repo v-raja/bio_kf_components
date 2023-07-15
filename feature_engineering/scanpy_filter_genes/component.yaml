@@ -1,0 +1,61 @@
+name: Scanpy filter genes
+description: Filters genes from an AnnData object.
+inputs:
+- {name: dataset, type: Dataset, description: An AnnData object.}
+- {name: min_cells, type: String, description: Minimum number of cells that a gene
+    must be detected in to be kept. This param is evaluated as a Python expression
+    so can reference the dataset variable., default: 'dataset.shape[0] * 0.05', optional: true}
+outputs:
+- {name: transformed_dataset, type: Dataset, description: The AnnData object.}
+implementation:
+  container:
+    image: python:3.7
+    command:
+    - sh
+    - -c
+    - |2
+
+      if ! [ -x "$(command -v pip)" ]; then
+          python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip
+      fi
+
+      PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'anndata' 'scanpy' 'kfp==1.8.19' && "$0" "$@"
+    - sh
+    - -ec
+    - |
+      program_path=$(mktemp -d)
+      printf "%s" "$0" > "$program_path/ephemeral_component.py"
+      python3 -m kfp.v2.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+    - |2+
+
+      import kfp
+      from kfp.v2 import dsl
+      from kfp.v2.dsl import *
+      from typing import *
+
+      def scanpy_filter_genes(
+              dataset: Input[Dataset],
+              transformed_dataset: Output[Dataset],
+              min_cells: str = "dataset.shape[0] * 0.05",
+      ):
+          """
+          Filters genes from an AnnData object.
+          :param dataset: An AnnData object.
+          :param transformed_dataset: The AnnData object.
+          :param min_cells: Minimum number of cells that a gene must be detected in to be kept. This param is evaluated as a Python expression so can reference the dataset variable.
+          """
+          import scanpy as sc
+          import anndata
+
+          aadata = anndata.read_h5ad(dataset.path)
+          min_cells = int(eval(min_cells))
+          # in-place filtering of regions
+          sc.pp.filter_genes(aadata, min_cells=min_cells)
+
+          aadata.write(transformed_dataset.path)
+
+    args:
+    - --executor_input
+    - {executorInput: null}
+    - --function_to_execute
+    - scanpy_filter_genes

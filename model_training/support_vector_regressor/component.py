@@ -17,7 +17,6 @@ def support_vector_regressor(
         epsilon: float = 0.1,
         shrinking: bool = True,
         cache_size: int = 200,
-        verbose: bool = False,
         max_iter: int = -1,
 ):
     """
@@ -33,7 +32,6 @@ def support_vector_regressor(
     :param epsilon: Please see the documentation for sklearn.svm.SVR for more details.
     :param shrinking: Please see the documentation for sklearn.svm.SVR for more details.
     :param cache_size: Please see the documentation for sklearn.svm.SVR for more details.
-    :param verbose: Please see the documentation for sklearn.svm.SVR for more details.
     :param max_iter: Please see the documentation for sklearn.svm.SVR for more details.
     :return:
     """
@@ -54,7 +52,7 @@ def support_vector_regressor(
         epsilon=epsilon,
         shrinking=shrinking,
         cache_size=cache_size,
-        verbose=verbose,
+        verbose=True,
         max_iter=max_iter,
     ).fit(X, y)
 

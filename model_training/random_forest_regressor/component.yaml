@@ -114,6 +114,7 @@ implementation:
           model = RandomForestRegressor(
               n_estimators=n_estimators,
               max_depth=None if max_depth == 0 else max_depth,
+              verbose=1,
               min_samples_split=int(min_samples_split) if min_samples_split.is_integer() else min_samples_split,
               min_samples_leaf=int(min_samples_leaf) if min_samples_leaf.is_integer() else min_samples_leaf,
           ).fit(X, y)

@@ -1,0 +1,83 @@
+name: Sklearn train test split
+description: Splits the dataset into training and testing datasets.
+inputs:
+- {name: dataset, type: Dataset, description: The dataset to split.}
+- {name: test_size, type: Float, description: 'See https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.train_test_split.html.',
+  default: '0.2', optional: true}
+- {name: random_state, type: Integer, description: 'See https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.train_test_split.html.',
+  default: '42', optional: true}
+- name: shuffle
+  type: Boolean
+  description: See https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.train_test_split.html.
+  default: "True"
+  optional: true
+outputs:
+- {name: train_dataset, type: Dataset, description: The training dataset.}
+- {name: test_dataset, type: Dataset, description: The testing dataset.}
+implementation:
+  container:
+    image: python:3.7
+    command:
+    - sh
+    - -c
+    - |2
+
+      if ! [ -x "$(command -v pip)" ]; then
+          python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip
+      fi
+
+      PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'scikit-learn' 'numpy' 'kfp==1.8.19' && "$0" "$@"
+    - sh
+    - -ec
+    - |
+      program_path=$(mktemp -d)
+      printf "%s" "$0" > "$program_path/ephemeral_component.py"
+      python3 -m kfp.v2.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+    - |2+
+
+      import kfp
+      from kfp.v2 import dsl
+      from kfp.v2.dsl import *
+      from typing import *
+
+      def sklearn_train_test_split(
+          dataset: Input[Dataset],
+          train_dataset: Output[Dataset],
+          test_dataset: Output[Dataset],
+          test_size: float = 0.2,
+          random_state: int = 42,
+          shuffle: bool = True,
+          # stratify: List[Union[str, int]] = None,
+      ):
+          """
+          Splits the dataset into training and testing datasets.
+          :param dataset: The dataset to split.
+          :param train_dataset: The training dataset.
+          :param test_dataset: The testing dataset.
+          :param test_size: See https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.train_test_split.html.
+          :param random_state: See https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.train_test_split.html.
+          :param shuffle: See https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.train_test_split.html.
+          :param stratify: See https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.train_test_split.html.
+          """
+          from sklearn.model_selection import train_test_split
+
+          import numpy as np
+
+          dataset = np.loadtxt(dataset.path)
+
+          train, test = train_test_split(
+              dataset,
+              test_size=test_size,
+              random_state=random_state,
+              shuffle=shuffle,
+              # stratify=stratify,
+          )
+
+          np.savetxt(train_dataset.path, train)
+          np.savetxt(test_dataset.path, test)
+
+    args:
+    - --executor_input
+    - {executorInput: null}
+    - --function_to_execute
+    - sklearn_train_test_split

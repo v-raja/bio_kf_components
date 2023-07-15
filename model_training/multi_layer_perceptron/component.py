@@ -20,7 +20,6 @@ def multi_layer_perceptron(
         shuffle: bool = True,
         random_state: int = None,
         tol: float = 1e-4,
-        verbose: bool = False,
         warm_start: bool = False,
         momentum: float = 0.9,
         nesterovs_momentum: bool = True,
@@ -129,9 +128,6 @@ def multi_layer_perceptron(
         unless ``learning_rate`` is set to 'adaptive', convergence is
         considered to be reached and training stops.
 
-    :param verbose : bool, default=False
-        Whether to print progress messages to stdout.
-
     :param warm_start : bool, default=False
         When set to True, reuse the solution of the previous
         call to fit as initialization, otherwise, just erase the
@@ -189,9 +185,7 @@ def multi_layer_perceptron(
     X = np.genfromtxt(inputs_dataset.path, delimiter=",")
     y = np.genfromtxt(labels_dataset.path, delimiter=",")
 
-    # hidden_layer_sizes_tuple = eval(hidden_layer_sizes)
     model = MLPRegressor(
-        hidden_layer_sizes=hidden_layer_sizes,
         activation=activation,
         solver=solver,
         alpha=alpha,
@@ -203,7 +197,7 @@ def multi_layer_perceptron(
         shuffle=shuffle,
         random_state=random_state,
         tol=tol,
-        verbose=verbose,
+        verbose=True,
         warm_start=warm_start,
         momentum=momentum,
         nesterovs_momentum=nesterovs_momentum,

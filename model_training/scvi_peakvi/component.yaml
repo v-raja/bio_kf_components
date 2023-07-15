@@ -1,0 +1,61 @@
+name: Scvi peakvi
+description: Trains a PEAKVI model.
+inputs:
+- {name: inputs_dataset, type: Dataset, description: An AnnData object.}
+outputs:
+- {name: trained_model, type: Model, description: The trained model.}
+- {name: adata, type: Dataset, description: The AnnData object required when loading
+    the trained model.}
+implementation:
+  container:
+    image: python:3.7
+    command:
+    - sh
+    - -c
+    - |2
+
+      if ! [ -x "$(command -v pip)" ]; then
+          python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip
+      fi
+
+      PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'anndata' 'scvi' 'kfp==1.8.19' && "$0" "$@"
+    - sh
+    - -ec
+    - |
+      program_path=$(mktemp -d)
+      printf "%s" "$0" > "$program_path/ephemeral_component.py"
+      python3 -m kfp.v2.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+    - |2+
+
+      import kfp
+      from kfp.v2 import dsl
+      from kfp.v2.dsl import *
+      from typing import *
+
+      def scvi_peakvi(
+              inputs_dataset: Input[Dataset],
+              trained_model: Output[Model],
+              adata: Output[Dataset],
+      ):
+          """
+          Trains a PEAKVI model.
+          :param inputs_dataset: An AnnData object.
+          :param trained_model: The trained model.
+          :param adata: The AnnData object required when loading the trained model.
+          """
+          import anndata
+          import scvi
+
+          aadata = anndata.read_h5ad(inputs_dataset.path)
+          scvi.model.PEAKVI.setup_anndata(aadata)
+          pvi = scvi.model.PEAKVI(aadata)
+          pvi.train()
+
+          pvi.save(trained_model.path)
+          aadata.write(adata.path)
+
+    args:
+    - --executor_input
+    - {executorInput: null}
+    - --function_to_execute
+    - scvi_peakvi

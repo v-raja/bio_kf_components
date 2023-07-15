@@ -5,3 +5,6 @@ xgboost
 IPython
 joblib
 pandas
+scvi
+anndata
+scanpy
